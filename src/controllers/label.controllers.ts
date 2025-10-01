@@ -1,0 +1,271 @@
+import { Request, Response } from "express";
+import { LabelService } from "../services/label.services";
+import { AppError } from "../middleware/erroeHandler";
+import {
+  CreateLabel,
+  LabelResponse,
+  LabelsListResponse,
+  UpdateLabel,
+  BaseResponse,
+  ProgramGuideResponse,
+} from "../types/label.types";
+
+// create one instance
+const labelService = new LabelService();
+
+export class LabelController {
+  static async createLabel(req: Request, res: Response<LabelResponse>) {
+    const labelData: CreateLabel = req.body;
+    if (!req.user?.email) {
+      throw new AppError("User email not found", 401);
+    }
+
+    const label = await labelService.createLabel({
+      ...labelData,
+      created_by: req.user.email,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Label created successfully",
+      data: { label },
+    });
+  }
+
+  static async getUnlabeledEvents(
+    req: Request,
+    res: Response<LabelsListResponse>
+  ) {
+    const options = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 10,
+      startDate: req.query.startDate
+        ? new Date(req.query.startDate as string)
+        : undefined,
+      endDate: req.query.endDate
+        ? new Date(req.query.endDate as string)
+        : undefined,
+      deviceId: req.query.deviceId as string | undefined,
+      types: req.query.types
+        ? (req.query.types as string)
+            .split(",")
+            .map(Number)
+            .filter((n) => !isNaN(n))
+        : undefined,
+      sort: (req.query.sort as "asc" | "desc") || "desc",
+    };
+
+    if (options.startDate && isNaN(options.startDate.getTime())) {
+      throw new AppError("Invalid start date", 400);
+    }
+    if (options.endDate && isNaN(options.endDate.getTime())) {
+      throw new AppError("Invalid end date", 400);
+    }
+
+    const result = await labelService.getUnlabeledEvents(options);
+
+    return res.status(200).json({
+      success: true,
+      message: "Unlabeled events fetched successfully",
+      data: result,
+    });
+  }
+
+  static async getLabels(req: Request, res: Response<LabelsListResponse>) {
+    const options = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 10,
+      startDate: req.query.startDate
+        ? new Date(req.query.startDate as string)
+        : undefined,
+      endDate: req.query.endDate
+        ? new Date(req.query.endDate as string)
+        : undefined,
+      createdBy: req.query.createdBy as string | undefined,
+      labelType: req.query.labelType as string | undefined,
+      deviceId: req.query.deviceId as string | undefined,
+      sort: (req.query.sort as "asc" | "desc") || "desc",
+    };
+
+    if (options.startDate && isNaN(options.startDate.getTime())) {
+      throw new AppError("Invalid start date", 400);
+    }
+    if (options.endDate && isNaN(options.endDate.getTime())) {
+      throw new AppError("Invalid end date", 400);
+    }
+
+    const result = await labelService.getLabels(options);
+
+    return res.status(200).json({
+      success: true,
+      message: "Labels fetched successfully",
+      data: result,
+    });
+  }
+
+  static async updateLabel(req: Request, res: Response<LabelResponse>) {
+    const labelIdParam = req.params.id;
+    if (!labelIdParam) {
+      throw new AppError("Label ID is required", 400);
+    }
+
+    const labelId = parseInt(labelIdParam);
+    if (isNaN(labelId)) {
+      throw new AppError("Invalid label ID", 400);
+    }
+
+    const labelData: UpdateLabel = req.body;
+    const label = await labelService.updateLabel(labelId, labelData);
+
+    return res.status(200).json({
+      success: true,
+      message: "Label updated successfully",
+      data: { label },
+    });
+  }
+
+  static async deleteLabel(req: Request, res: Response<BaseResponse>) {
+    const labelIdParam = req.params.id;
+    if (!labelIdParam) {
+      throw new AppError("Label ID is required", 400);
+    }
+
+    const labelId = parseInt(labelIdParam);
+    if (isNaN(labelId)) {
+      throw new AppError("Invalid label ID", 400);
+    }
+
+    await labelService.deleteLabel(labelId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Label deleted successfully",
+    });
+  }
+
+  static async deleteLabelsBulk(req: Request, res: Response<BaseResponse>) {
+    const labelIds = req.body.labelIds || req.body.ids;
+    if (!Array.isArray(labelIds) || labelIds.length === 0) {
+      throw new AppError("Label IDs are required", 400);
+    }
+
+    const validIds = labelIds.filter((id: any) => !isNaN(parseInt(id)));
+    if (validIds.length === 0) {
+      throw new AppError("No valid label IDs provided", 400);
+    }
+
+    await labelService.deleteLabelsBulk(
+      validIds.map((id: any) => parseInt(id))
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Labels deleted successfully",
+    });
+  }
+
+  static async getProgramGuideByDate(
+    req: Request,
+    res: Response<ProgramGuideResponse>
+  ) {
+    const { date, deviceId } = req.params;
+
+    if (!date) {
+      throw new AppError("Date is required in format YYYY-MM-DD", 400);
+    }
+
+    if (!deviceId) {
+      throw new AppError("Device ID is required", 400);
+    }
+
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      throw new AppError("Invalid date format. Use YYYY-MM-DD", 400);
+    }
+
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      throw new AppError("Invalid date", 400);
+    }
+
+    
+
+    const labels = await labelService.getProgramGuideByDate(
+      parsedDate,
+      deviceId, 
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Program guide fetched successfully",
+      data: {
+        date,
+        labels,
+      },
+    });
+  }
+
+  static async getMovies(req: Request, res: Response<LabelsListResponse>) {
+    const options = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 10,
+      startDate: req.query.startDate
+        ? new Date(req.query.startDate as string)
+        : undefined,
+      endDate: req.query.endDate
+        ? new Date(req.query.endDate as string)
+        : undefined,
+      createdBy: req.query.createdBy as string | undefined,
+      labelType: "movie" as string,
+      deviceId: req.query.deviceId as string | undefined,
+      sort: (req.query.sort as "asc" | "desc") || "desc",
+    };
+
+    if (options.startDate && isNaN(options.startDate.getTime())) {
+      throw new AppError("Invalid start date", 400);
+    }
+    if (options.endDate && isNaN(options.endDate.getTime())) {
+      throw new AppError("Invalid end date", 400);
+    }
+
+    const result = await labelService.getLabels(options);
+
+    return res.status(200).json({
+      success: true,
+      message: "Movie labels fetched successfully",
+      data: result,
+    });
+  }
+
+  static async getSports(req: Request, res: Response<LabelsListResponse>) {
+    const options = {
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 10,
+      startDate: req.query.startDate
+        ? new Date(req.query.startDate as string)
+        : undefined,
+      endDate: req.query.endDate
+        ? new Date(req.query.endDate as string)
+        : undefined,
+      createdBy: req.query.createdBy as string | undefined,
+      labelType: "sports" as string,
+      deviceId: req.query.deviceId as string | undefined,
+      sort: (req.query.sort as "asc" | "desc") || "desc",
+    };
+
+    if (options.startDate && isNaN(options.startDate.getTime())) {
+      throw new AppError("Invalid start date", 400);
+    }
+    if (options.endDate && isNaN(options.endDate.getTime())) {
+      throw new AppError("Invalid end date", 400);
+    }
+
+    const result = await labelService.getLabels(options);
+
+    return res.status(200).json({
+      success: true,
+      message: "Sports labels fetched successfully",
+      data: result,
+    });
+  }
+}
