@@ -19,6 +19,7 @@ import { LabelSports } from "./labelSports.entity";
 import { LabelStandBy } from "./labelStandBy.entity";
 import { LabelPromo } from "./labelPromo.entity";
 import { LabelSpotOutsideBreak } from "./labelSpotOutSideBreak";
+import { AsRun } from "./asrun.entity";
 
 
 
@@ -44,6 +45,7 @@ export const entities = [
   LabelSports,
   LabelStandBy,
   LabelPromo,
-  LabelSpotOutsideBreak
+  LabelSpotOutsideBreak,
+  AsRun
   
 ];
